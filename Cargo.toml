@@ -8,4 +8,6 @@ edition = "2021"
 [dependencies]
 hmac-sha1 = "0.1"
 chrono = "0.4"
-
+hmac = "0.12"
+sha-1 = "0.10"
+sha2 = "0.10"

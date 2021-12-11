@@ -1,22 +1,58 @@
-use hmacsha1::hmac_sha1;
 use chrono::prelude::*;
+use hmac::{Hmac, Mac};
+use sha1::Sha1;
+use sha2::{Sha256, Sha512};
+
+pub enum HashType {
+    Sha1,
+    Sha256,
+    Sha512,
+}
 
 pub struct HotpClient {
     key: String,
-    digit: u32
+    digit: u32,
+    hashtype: HashType,
 }
 
-impl HotpClient{
-    pub fn new(key: String, digit: u32) -> HotpClient{
-	HotpClient{key, digit}
+impl HotpClient {
+    pub fn new(key: String, digit: u32, hashtype: HashType) -> HotpClient {
+        HotpClient {
+            key,
+            digit,
+            hashtype,
+        }
     }
 
-    pub fn hotp(&self, counter: &u64) -> u32{
-	let key = self.key.as_bytes();
-	let counter = counter.to_be_bytes();
-	let hs = hmac_sha1(&key, &counter);
-	let bin_code = u32::from_be_bytes(dynamic_truncate(&hs));
-	bin_code % 10u32.pow(self.digit)
+    pub fn hotp(&self, counter: &u64) -> u32 {
+        let hs = match self.hashtype {
+            HashType::Sha1 => self.hmac_sha1(counter),
+            HashType::Sha256 => self.hmac_sha256(counter),
+            HashType::Sha512 => self.hmac_sha512(counter),
+        };
+        let bin_code = u32::from_be_bytes(dynamic_truncate(&hs));
+        bin_code % 10u32.pow(self.digit)
+    }
+
+    fn hmac_sha1(&self, counter: &u64) -> Vec<u8> {
+        let mut hasher = Hmac::<Sha1>::new_from_slice(self.key.as_bytes())
+            .expect("HMAC can take key of any size");
+        hasher.update(&counter.to_be_bytes());
+        hasher.finalize().into_bytes().to_vec()
+    }
+
+    fn hmac_sha256(&self, counter: &u64) -> Vec<u8> {
+        let mut hasher = Hmac::<Sha256>::new_from_slice(self.key.as_bytes())
+            .expect("HMAC can take key of any size");
+        hasher.update(&counter.to_be_bytes());
+        hasher.finalize().into_bytes().to_vec()
+    }
+
+    fn hmac_sha512(&self, counter: &u64) -> Vec<u8> {
+        let mut hasher = Hmac::<Sha512>::new_from_slice(self.key.as_bytes())
+            .expect("HMAC can take key of any size");
+        hasher.update(&counter.to_be_bytes());
+        hasher.finalize().into_bytes().to_vec()
     }
 }
 
@@ -27,19 +63,18 @@ pub struct TotpClient {
 }
 
 impl TotpClient {
-    pub fn new(key: String, timestep: u64, t0: u64, digit: u32) -> TotpClient{
-	let hotp = HotpClient::new(key, digit);
-	TotpClient{hotp, timestep, t0}
+    pub fn new(key: String, timestep: u64, t0: u64, digit: u32, hashtype: HashType) -> TotpClient {
+        let hotp = HotpClient::new(key, digit, hashtype);
+        TotpClient { hotp, timestep, t0 }
     }
-    
     pub fn totp(&self, datetime: &DateTime<Utc>) -> u32 {
         let t = ((datetime.timestamp() as u64) - self.t0) / self.timestep;
         self.hotp.hotp(&t)
     }
 }
 
-fn dynamic_truncate(hs: &[u8; 20]) -> [u8; 4] {
-    let offset = (hs[19] & 0xf) as usize;
+fn dynamic_truncate(hs: &Vec<u8>) -> [u8; 4] {
+    let offset = (hs.last().unwrap() & 0xf) as usize;
     let bin_code = [
         hs[offset] & 0x7f,
         hs[offset + 1],
@@ -55,7 +90,7 @@ mod test {
 
     #[test]
     fn rfc4226_example() {
-	let hotp = HotpClient::new("12345678901234567890".to_string(), 6);
+        let hotp = HotpClient::new("12345678901234567890".to_string(), 6, HashType::Sha1);
         let result: [u32; 10] = [
             755224, 287082, 359152, 969429, 338314, 254676, 287922, 162583, 399871, 520489,
         ];
@@ -66,18 +101,94 @@ mod test {
 
     #[test]
     fn rfc6238_example_sha1() {
-	let totp = TotpClient::new("12345678901234567890".to_string(), 30, 0, 8);
-	
-	let datetime_format = "%Y-%m-%d %H:%M:%S";
-	let datetime = Utc.datetime_from_str("1970-01-01 00:00:59", datetime_format).unwrap();
-	assert_eq!(totp.totp(&datetime), 94287082);
-	let datetime = Utc.datetime_from_str("2005-03-18 01:58:29", datetime_format).unwrap();
-	assert_eq!(totp.totp(&datetime), 07081804);
-	let datetime = Utc.datetime_from_str("2009-02-13 23:31:30", datetime_format).unwrap();
-	assert_eq!(totp.totp(&datetime), 89005924);
-	let datetime = Utc.datetime_from_str("2033-05-18 03:33:20", datetime_format).unwrap();
-	assert_eq!(totp.totp(&datetime), 69279037);
-	let datetime = Utc.datetime_from_str("2603-10-11 11:33:20", datetime_format).unwrap();
-	assert_eq!(totp.totp(&datetime), 65353130);
+        let totp = TotpClient::new("12345678901234567890".to_string(), 30, 0, 8, HashType::Sha1);
+
+        let datetime_format = "%Y-%m-%d %H:%M:%S";
+        let datetime = Utc
+            .datetime_from_str("1970-01-01 00:00:59", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 94287082);
+        let datetime = Utc
+            .datetime_from_str("2005-03-18 01:58:29", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 07081804);
+        let datetime = Utc
+            .datetime_from_str("2009-02-13 23:31:30", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 89005924);
+        let datetime = Utc
+            .datetime_from_str("2033-05-18 03:33:20", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 69279037);
+        let datetime = Utc
+            .datetime_from_str("2603-10-11 11:33:20", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 65353130);
+    }
+
+    #[test]
+    fn rfc6238_example_sha256() {
+        let totp = TotpClient::new(
+            "12345678901234567890123456789012".to_string(),
+            30,
+            0,
+            8,
+            HashType::Sha256,
+        );
+
+        let datetime_format = "%Y-%m-%d %H:%M:%S";
+        let datetime = Utc
+            .datetime_from_str("1970-01-01 00:00:59", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 46119246);
+        let datetime = Utc
+            .datetime_from_str("2005-03-18 01:58:29", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 68084774);
+        let datetime = Utc
+            .datetime_from_str("2009-02-13 23:31:30", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 91819424);
+        let datetime = Utc
+            .datetime_from_str("2033-05-18 03:33:20", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 90698825);
+        let datetime = Utc
+            .datetime_from_str("2603-10-11 11:33:20", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 77737706);
+    }
+
+    #[test]
+    fn rfc6238_example_sha512() {
+        let totp = TotpClient::new(
+            "1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+            30,
+            0,
+            8,
+            HashType::Sha512,
+        );
+
+        let datetime_format = "%Y-%m-%d %H:%M:%S";
+        let datetime = Utc
+            .datetime_from_str("1970-01-01 00:00:59", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 90693936);
+        let datetime = Utc
+            .datetime_from_str("2005-03-18 01:58:29", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 25091201);
+        let datetime = Utc
+            .datetime_from_str("2009-02-13 23:31:30", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 93441116);
+        let datetime = Utc
+            .datetime_from_str("2033-05-18 03:33:20", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 38618901);
+        let datetime = Utc
+            .datetime_from_str("2603-10-11 11:33:20", datetime_format)
+            .unwrap();
+        assert_eq!(totp.totp(&datetime), 47863826);
     }
 }
