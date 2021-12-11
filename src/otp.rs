@@ -1,24 +1,40 @@
+use hmacsha1::hmac_sha1;
 use chrono::prelude::*;
 
-pub fn hotp(counter: &u64, key: &str, digit: &u32) -> u32 {
-    let key = key.as_bytes();
-    let counter = counter.to_be_bytes();
-    let hs = hmacsha1::hmac_sha1(&key, &counter);
-    let bin_code = u32::from_be_bytes(dynamic_truncate(&hs));
-    bin_code % 10u32.pow(*digit)
+pub struct HotpClient {
+    key: String,
+    digit: u32
+}
+
+impl HotpClient{
+    pub fn new(key: String, digit: u32) -> HotpClient{
+	HotpClient{key, digit}
+    }
+
+    pub fn hotp(&self, counter: &u64) -> u32{
+	let key = self.key.as_bytes();
+	let counter = counter.to_be_bytes();
+	let hs = hmac_sha1(&key, &counter);
+	let bin_code = u32::from_be_bytes(dynamic_truncate(&hs));
+	bin_code % 10u32.pow(self.digit)
+    }
 }
 
 pub struct TotpClient {
-    key: String,
+    hotp: HotpClient,
     timestep: u64,
     t0: u64,
-    digit: u32,
 }
 
 impl TotpClient {
+    pub fn new(key: String, timestep: u64, t0: u64, digit: u32) -> TotpClient{
+	let hotp = HotpClient::new(key, digit);
+	TotpClient{hotp, timestep, t0}
+    }
+    
     pub fn totp(&self, datetime: &DateTime<Utc>) -> u32 {
         let t = ((datetime.timestamp() as u64) - self.t0) / self.timestep;
-        hotp(&t, &self.key, &self.digit)
+        self.hotp.hotp(&t)
     }
 }
 
@@ -39,23 +55,18 @@ mod test {
 
     #[test]
     fn rfc4226_example() {
-        let secret = "12345678901234567890";
+	let hotp = HotpClient::new("12345678901234567890".to_string(), 6);
         let result: [u32; 10] = [
             755224, 287082, 359152, 969429, 338314, 254676, 287922, 162583, 399871, 520489,
         ];
         for (c, r) in result.iter().enumerate() {
-            assert_eq!(hotp(&(c as u64), &secret, &6), *r);
+            assert_eq!(hotp.hotp(&(c as u64)), *r);
         }
     }
 
     #[test]
     fn rfc6238_example_sha1() {
-	let totp = TotpClient{
-	    key: "12345678901234567890".to_string(),
-	    timestep: 30,
-	    t0: 0,
-	    digit: 8
-	};
+	let totp = TotpClient::new("12345678901234567890".to_string(), 30, 0, 8);
 	
 	let datetime_format = "%Y-%m-%d %H:%M:%S";
 	let datetime = Utc.datetime_from_str("1970-01-01 00:00:59", datetime_format).unwrap();
