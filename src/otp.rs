@@ -3,13 +3,16 @@ use data_encoding::{DecodeError, BASE32};
 use hmac::{Hmac, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
+use serde;
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub enum HashType {
     Sha1,
     Sha256,
     Sha512,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub struct HotpClient {
     key: Vec<u8>,
     digit: u32,
@@ -57,6 +60,7 @@ impl HotpClient {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub struct TotpClient {
     hotp: HotpClient,
     timestep: u64,
