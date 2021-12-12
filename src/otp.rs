@@ -13,14 +13,14 @@ pub enum HashType {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
-pub struct HotpClient {
+struct HotpClient {
     key: Vec<u8>,
     digit: u32,
     hashtype: HashType,
 }
 
 impl HotpClient {
-    pub fn new(key: Vec<u8>, digit: u32, hashtype: HashType) -> HotpClient {
+    fn new(key: Vec<u8>, digit: u32, hashtype: HashType) -> HotpClient {
         HotpClient {
             key,
             digit,
@@ -28,7 +28,7 @@ impl HotpClient {
         }
     }
 
-    pub fn hotp(&self, counter: &u64) -> u32 {
+    fn hotp(&self, counter: &u64) -> u32 {
         let hs = match self.hashtype {
             HashType::Sha1 => self.hmac_sha1(counter),
             HashType::Sha256 => self.hmac_sha256(counter),
