@@ -1,4 +1,5 @@
 use chrono::prelude::*;
+use data_encoding::{DecodeError, BASE32};
 use hmac::{Hmac, Mac};
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
@@ -66,6 +67,18 @@ impl TotpClient {
     pub fn new(key: Vec<u8>, timestep: u64, t0: u64, digit: u32, hashtype: HashType) -> TotpClient {
         let hotp = HotpClient::new(key, digit, hashtype);
         TotpClient { hotp, timestep, t0 }
+    }
+
+    pub fn new_from_base32key(
+        key: String,
+        timestep: u64,
+        t0: u64,
+        digit: u32,
+        hashtype: HashType,
+    ) -> Result<TotpClient, DecodeError> {
+        let key = BASE32.decode(key.as_bytes())?;
+        let hotp = HotpClient::new(key, digit, hashtype);
+        Ok(TotpClient { hotp, timestep, t0 })
     }
 
     pub fn totp(&self, datetime: &DateTime<Utc>) -> u32 {
