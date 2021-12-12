@@ -10,13 +10,13 @@ pub enum HashType {
 }
 
 pub struct HotpClient {
-    key: String,
+    key: Vec<u8>,
     digit: u32,
     hashtype: HashType,
 }
 
 impl HotpClient {
-    pub fn new(key: String, digit: u32, hashtype: HashType) -> HotpClient {
+    pub fn new(key: Vec<u8>, digit: u32, hashtype: HashType) -> HotpClient {
         HotpClient {
             key,
             digit,
@@ -35,22 +35,22 @@ impl HotpClient {
     }
 
     fn hmac_sha1(&self, counter: &u64) -> Vec<u8> {
-        let mut hasher = Hmac::<Sha1>::new_from_slice(self.key.as_bytes())
-            .expect("HMAC can take key of any size");
+        let mut hasher =
+            Hmac::<Sha1>::new_from_slice(&self.key).expect("HMAC can take key of any size");
         hasher.update(&counter.to_be_bytes());
         hasher.finalize().into_bytes().to_vec()
     }
 
     fn hmac_sha256(&self, counter: &u64) -> Vec<u8> {
-        let mut hasher = Hmac::<Sha256>::new_from_slice(self.key.as_bytes())
-            .expect("HMAC can take key of any size");
+        let mut hasher =
+            Hmac::<Sha256>::new_from_slice(&self.key).expect("HMAC can take key of any size");
         hasher.update(&counter.to_be_bytes());
         hasher.finalize().into_bytes().to_vec()
     }
 
     fn hmac_sha512(&self, counter: &u64) -> Vec<u8> {
-        let mut hasher = Hmac::<Sha512>::new_from_slice(self.key.as_bytes())
-            .expect("HMAC can take key of any size");
+        let mut hasher =
+            Hmac::<Sha512>::new_from_slice(&self.key).expect("HMAC can take key of any size");
         hasher.update(&counter.to_be_bytes());
         hasher.finalize().into_bytes().to_vec()
     }
@@ -63,10 +63,11 @@ pub struct TotpClient {
 }
 
 impl TotpClient {
-    pub fn new(key: String, timestep: u64, t0: u64, digit: u32, hashtype: HashType) -> TotpClient {
+    pub fn new(key: Vec<u8>, timestep: u64, t0: u64, digit: u32, hashtype: HashType) -> TotpClient {
         let hotp = HotpClient::new(key, digit, hashtype);
         TotpClient { hotp, timestep, t0 }
     }
+
     pub fn totp(&self, datetime: &DateTime<Utc>) -> u32 {
         let t = ((datetime.timestamp() as u64) - self.t0) / self.timestep;
         self.hotp.hotp(&t)
@@ -90,7 +91,11 @@ mod test {
 
     #[test]
     fn rfc4226_example() {
-        let hotp = HotpClient::new("12345678901234567890".to_string(), 6, HashType::Sha1);
+        let hotp = HotpClient::new(
+            "12345678901234567890".as_bytes().to_vec(),
+            6,
+            HashType::Sha1,
+        );
         let result: [u32; 10] = [
             755224, 287082, 359152, 969429, 338314, 254676, 287922, 162583, 399871, 520489,
         ];
@@ -101,7 +106,13 @@ mod test {
 
     #[test]
     fn rfc6238_example_sha1() {
-        let totp = TotpClient::new("12345678901234567890".to_string(), 30, 0, 8, HashType::Sha1);
+        let totp = TotpClient::new(
+            "12345678901234567890".as_bytes().to_vec(),
+            30,
+            0,
+            8,
+            HashType::Sha1,
+        );
 
         let datetime_format = "%Y-%m-%d %H:%M:%S";
         let datetime = Utc
@@ -129,7 +140,7 @@ mod test {
     #[test]
     fn rfc6238_example_sha256() {
         let totp = TotpClient::new(
-            "12345678901234567890123456789012".to_string(),
+            "12345678901234567890123456789012".as_bytes().to_vec(),
             30,
             0,
             8,
@@ -162,7 +173,9 @@ mod test {
     #[test]
     fn rfc6238_example_sha512() {
         let totp = TotpClient::new(
-            "1234567890123456789012345678901234567890123456789012345678901234".to_string(),
+            "1234567890123456789012345678901234567890123456789012345678901234"
+                .as_bytes()
+                .to_vec(),
             30,
             0,
             8,
