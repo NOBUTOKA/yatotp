@@ -1,3 +1,3 @@
-pub mod otp;
-pub mod database;
 pub mod cli;
+pub mod database;
+pub mod otp;

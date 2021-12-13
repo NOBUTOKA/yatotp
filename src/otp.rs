@@ -1,6 +1,6 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::prelude::*;
-use data_encoding::{BASE32};
+use data_encoding::BASE32;
 use hmac::{Hmac, Mac};
 use serde;
 use sha1::Sha1;
@@ -81,7 +81,9 @@ impl TotpClient {
         digit: u32,
         hashtype: HashType,
     ) -> Result<TotpClient> {
-        let key = BASE32.decode(key.as_bytes())?;
+        let key = BASE32
+            .decode(key.as_bytes())
+            .context("Failed to decode base32-encoded key.")?;
         let hotp = HotpClient::new(key, digit, hashtype);
         Ok(TotpClient { hotp, timestep, t0 })
     }

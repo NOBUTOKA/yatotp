@@ -1,6 +1,7 @@
 use crate::*;
+use anyhow::{ensure, Result};
 
-pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) {
+pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) -> Result<()> {
     let mut db: database::TotpDatabase;
     if !input_path.is_file() {
         println!("Database file does not exist.");
@@ -12,7 +13,7 @@ pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) {
         {
             db = database::TotpDatabase::new();
         } else {
-            std::process::exit(0);
+            return Ok(());
         }
     } else {
         db = database::load_database(input_path).unwrap();
@@ -21,12 +22,11 @@ pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) {
         .with_prompt("Name")
         .interact_text()
         .unwrap();
-    if db.contains_key(&name) {
-        panic!(
-            "Totp of given name is already exist in the database: {}",
-            name
-        );
-    }
+    ensure!(
+        !db.contains_key(&name),
+        "Entry named {} does already exist in the database",
+        &name
+    );
     let key = dialoguer::Password::new()
         .with_prompt("Secret key")
         .interact()
@@ -66,9 +66,10 @@ pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) {
         &_ => otp::HashType::Sha1,
     };
     let client = match base32_encode {
-        true => otp::TotpClient::new_from_base32key(key, timestep, t0, digit, hashtype).unwrap(),
+        true => otp::TotpClient::new_from_base32key(key, timestep, t0, digit, hashtype)?,
         false => otp::TotpClient::new(key.as_bytes().to_vec(), timestep, t0, digit, hashtype),
     };
     db.insert(name, client);
     database::save_database(&db, input_path).unwrap();
+    Ok(())
 }

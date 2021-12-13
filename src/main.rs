@@ -1,5 +1,6 @@
 extern crate yatotp;
 
+use anyhow::Result;
 use structopt::StructOpt;
 use yatotp::*;
 
@@ -25,12 +26,13 @@ enum Command {
     Show { name: String },
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::from_args();
     match args.command {
-        Command::Add { base32_encode } => cli::add(&args.database, base32_encode),
+        Command::Add { base32_encode } => cli::add(&args.database, base32_encode)?,
         _ => (),
     }
+    Ok(())
     // totp.insert(
     //     "test".to_string(),
     //     otp::TotpClient::new_from_base32key(
