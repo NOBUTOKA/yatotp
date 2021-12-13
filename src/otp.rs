@@ -1,9 +1,10 @@
+use anyhow::Result;
 use chrono::prelude::*;
-use data_encoding::{DecodeError, BASE32};
+use data_encoding::{BASE32};
 use hmac::{Hmac, Mac};
+use serde;
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
-use serde;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub enum HashType {
@@ -79,7 +80,7 @@ impl TotpClient {
         t0: u64,
         digit: u32,
         hashtype: HashType,
-    ) -> Result<TotpClient, DecodeError> {
+    ) -> Result<TotpClient> {
         let key = BASE32.decode(key.as_bytes())?;
         let hotp = HotpClient::new(key, digit, hashtype);
         Ok(TotpClient { hotp, timestep, t0 })
