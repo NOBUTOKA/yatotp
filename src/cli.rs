@@ -1,9 +1,12 @@
 use crate::*;
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
+use chrono::Utc;
+use std::path::Path;
 
-pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) -> Result<()> {
+pub fn add<P: AsRef<Path>>(db_path: &P, base32_encode: bool) -> Result<()> {
     let mut db: database::TotpDatabase;
-    if !input_path.is_file() {
+    let db_path = db_path.as_ref();
+    if !db_path.is_file() {
         println!("Database file does not exist.");
         if dialoguer::Confirm::new()
             .with_prompt("Create new one?")
@@ -16,7 +19,8 @@ pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) -> Result<()> {
             return Ok(());
         }
     } else {
-        db = database::load_database(input_path).unwrap();
+        db = database::load_database(db_path)
+            .context(format!("Failed to load database from {:?}.", db_path))?;
     }
     let name: String = dialoguer::Input::new()
         .with_prompt("Name")
@@ -69,7 +73,43 @@ pub fn add(input_path: &std::path::PathBuf, base32_encode: bool) -> Result<()> {
         true => otp::TotpClient::new_from_base32key(key, timestep, t0, digit, hashtype)?,
         false => otp::TotpClient::new(key.as_bytes().to_vec(), timestep, t0, digit, hashtype),
     };
-    db.insert(name, client);
-    database::save_database(&db, input_path).unwrap();
+    db.insert(name.clone(), client);
+    database::save_database(&db, db_path)
+        .context(format!("Failed to save database to {:?}", db_path))?;
+    println!("Success to add item: {}", name);
+    Ok(())
+}
+
+pub fn remove<P: AsRef<Path>>(db_path: &P, name: &String) -> Result<()> {
+    let db_path = db_path.as_ref();
+    let mut db = database::load_database(&db_path)
+        .context(format!("Failed to load database from {:?}.", db_path))?;
+    db.remove(name);
+    database::save_database(&db, &db_path)
+        .context(format!("Failed to save database to {:?}", db_path))?;
+    println!("Success to remove item: {}", name);
+    Ok(())
+}
+
+pub fn show<P: AsRef<Path>>(db_path: &P, name: &String) -> Result<()> {
+    let db_path = db_path.as_ref();
+    let db = database::load_database(&db_path)
+        .context(format!("Failed to load database from {:?}.", db_path))?;
+    let client = &db[name];
+    println!(
+        "{:0>digit$}",
+        client.totp(&Utc::now()),
+        digit = *client.digit() as usize
+    );
+    Ok(())
+}
+
+pub fn list<P: AsRef<Path>>(db_path: &P) -> Result<()> {
+    let db_path = db_path.as_ref();
+    let db = database::load_database(&db_path)
+        .context(format!("Failed to load database from {:?}.", db_path))?;
+    for name in db.keys() {
+        println!("{}", name);
+    }
     Ok(())
 }

@@ -17,20 +17,30 @@ struct Args {
 enum Command {
     /// Add new entry to database.
     Add {
-        #[structopt(short = "e", long)]
+        #[structopt(short = "e", long, help = "Treat key as base32 encoded.")]
         base32_encode: bool,
     },
     /// Remove specified entry from database.
-    Remove { name: String },
+    Remove {
+        #[structopt(help = "Name of entry.")]
+        name: String,
+    },
     /// Show TOTP value of specified entry.
-    Show { name: String },
+    Show {
+        #[structopt(help = "Name of entry.")]
+        name: String,
+    },
+    /// Print list of TOTP entries.
+    List,
 }
 
 fn main() -> Result<()> {
     let args = Args::from_args();
     match args.command {
         Command::Add { base32_encode } => cli::add(&args.database, base32_encode)?,
-        _ => (),
+        Command::Remove { name } => cli::remove(&args.database, &name)?,
+        Command::Show { name } => cli::show(&args.database, &name)?,
+        Command::List => cli::list(&args.database)?,
     }
     Ok(())
     // totp.insert(

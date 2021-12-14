@@ -92,6 +92,10 @@ impl TotpClient {
         let t = ((datetime.timestamp() as u64) - self.t0) / self.timestep;
         self.hotp.hotp(&t)
     }
+
+    pub fn digit(&self) -> &u32 {
+        &self.hotp.digit
+    }
 }
 
 fn dynamic_truncate(hs: &Vec<u8>) -> [u8; 4] {
