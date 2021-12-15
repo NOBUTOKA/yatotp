@@ -6,6 +6,8 @@ authors = ["Nobuto Kaitoh <nobutoka@gmail.com>"]
 description = "A yet another TOTP client which stores its data locally."
 license = "GPL-3.0-or-later"
 exclude = ["*.yatotp"]
+repository = "https://github.com/NOBUTOKA/yatotp"
+categories = ["authentication", "command-line-utilities"]
 
 [dependencies]
 chrono = "0.4"
@@ -27,3 +29,4 @@ tempfile = "3.2"
 
 [badges]
 maintainance = {status = "actively-developed"}
+github = {repository = "NOBUTOKA/yatotp", workflow = "Rust"}

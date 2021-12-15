@@ -1,7 +1,8 @@
-# yatotp
-[![Rust](https://github.com/NOBUTOKA/yatotp/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/NOBUTOKA/yatotp/actions/workflows/rust.yml)
+[![Workflow Status](https://github.com/NOBUTOKA/yatotp/workflows/Rust/badge.svg)](https://github.com/NOBUTOKA/yatotp/actions?query=workflow%3A%22Rust%22)
 
-**Yet Another Time-based OTP client.**
+# yatotp
+
+Yet Another Time-based OTP client.
 
 It stores TOTP accounts information locally, encrypted
 so user can sync accounts with their own means (like cloud storage or USB storage).
