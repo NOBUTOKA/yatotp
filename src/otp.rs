@@ -139,7 +139,7 @@ impl TotpClient {
     ///
     /// # let totp = TotpClient::new("12345678901234567890".as_bytes().to_vec(), 30, 0, 8, HashType::Sha1);
     /// // Get present TOTP value
-    /// totp.totp(&Utc::now);
+    /// totp.totp(&Utc::now());
     pub fn totp(&self, datetime: &DateTime<Utc>) -> u32 {
         let t = ((datetime.timestamp() as u64) - self.t0) / self.timestep;
         self.hotp.hotp(&t)
