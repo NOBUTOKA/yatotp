@@ -1,3 +1,10 @@
+//! Time-Based OTP calculation.
+//!
+//! Provide Time-Based One-Time Password calculation.
+//! It conforms to [RFC 6238].
+//!
+//! [RFC 6238]: https://datatracker.ietf.org/doc/html/rfc6238
+
 use anyhow::{Context, Result};
 use chrono::prelude::*;
 use data_encoding::BASE32;
@@ -6,10 +13,20 @@ use serde;
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
 
+/// Hash function used in HMAC calculation.
+///
+/// Basically, [RFC 6238] uses SHA-1 hash function like [RFC 4226],
+/// but it also suggest that implementations MAY use SHA-256 and SHA-512.
+///
+/// [RFC 6238]: https://datatracker.ietf.org/doc/html/rfc6238
+/// [RFC 4226]: https://datatracker.ietf.org/doc/html/rfc4226
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub enum HashType {
+    /// Use SHA-1 as a hash function.
     Sha1,
+    /// Use SHA-2-256 as a hash function.
     Sha256,
+    /// Use SHA-2-512 as a hash function.
     Sha512,
 }
 
@@ -62,6 +79,27 @@ impl HotpClient {
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+/// A TOTP client for each account.
+///
+/// # Example
+///
+/// ```
+/// # use yatotp::otp::*;
+/// # use chrono::prelude::*;
+///
+/// // Construct TotpClient with byte array of secret key.
+/// let totp = TotpClient::new("12345678901234567890".as_bytes().to_vec(), 30, 0, 8, HashType::Sha1);
+/// let datetime = Utc.datetime_from_str("1970-01-01 00:00:59", "%Y-%m-%d %H:%M:%S").unwrap();
+/// // The first test vector in RFC 6238 Appendix B.
+/// assert_eq!(totp.totp(&datetime), 94287082);
+///
+/// // Construct TotpClient with base32-encoded secret key.
+/// let totp = TotpClient::from_base32key(
+///    "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQGEZA====".to_string(),
+///    30, 0, 8, HashType::Sha256).unwrap();
+/// // The second test vector.
+/// assert_eq!(totp.totp(&datetime), 46119246);
+/// ```
 pub struct TotpClient {
     hotp: HotpClient,
     timestep: u64,
@@ -69,12 +107,16 @@ pub struct TotpClient {
 }
 
 impl TotpClient {
+    /// Create a new TOTP client.
+    /// See examples in [TotpClient].
     pub fn new(key: Vec<u8>, timestep: u64, t0: u64, digit: u32, hashtype: HashType) -> TotpClient {
         let hotp = HotpClient::new(key, digit, hashtype);
         TotpClient { hotp, timestep, t0 }
     }
 
-    pub fn new_from_base32key(
+    /// Create a new TOTP client with base32-encoded key.
+    /// See examples in [TotpClient].
+    pub fn from_base32key(
         key: String,
         timestep: u64,
         t0: u64,
@@ -88,25 +130,35 @@ impl TotpClient {
         Ok(TotpClient { hotp, timestep, t0 })
     }
 
+    /// Calculate the TOTP value of given datetime.
+    ///
+    /// # Examples
+    /// ```
+    /// # use yatotp::otp::*;
+    /// # use chrono::prelude::*;
+    ///
+    /// # let totp = TotpClient::new("12345678901234567890".as_bytes().to_vec(), 30, 0, 8, HashType::Sha1);
+    /// // Get present TOTP value
+    /// totp.totp(&Utc::now);
     pub fn totp(&self, datetime: &DateTime<Utc>) -> u32 {
         let t = ((datetime.timestamp() as u64) - self.t0) / self.timestep;
         self.hotp.hotp(&t)
     }
 
+    /// Return digit of the TOTP.
     pub fn digit(&self) -> &u32 {
         &self.hotp.digit
     }
 }
 
-fn dynamic_truncate(hs: &Vec<u8>) -> [u8; 4] {
+fn dynamic_truncate(hs: &[u8]) -> [u8; 4] {
     let offset = (hs.last().unwrap() & 0xf) as usize;
-    let bin_code = [
+    [
         hs[offset] & 0x7f,
         hs[offset + 1],
         hs[offset + 2],
         hs[offset + 3],
-    ];
-    bin_code
+    ]
 }
 
 #[cfg(test)]
@@ -146,7 +198,7 @@ mod test {
         let datetime = Utc
             .datetime_from_str("2005-03-18 01:58:29", datetime_format)
             .unwrap();
-        assert_eq!(totp.totp(&datetime), 07081804);
+        assert_eq!(totp.totp(&datetime), 7081804);
         let datetime = Utc
             .datetime_from_str("2009-02-13 23:31:30", datetime_format)
             .unwrap();

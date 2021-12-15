@@ -1,8 +1,16 @@
+//! Command-line Interface of yatotp.
+//!
+//! Each command loads database file, do some works, and then save database file if needed.
+//! Some command such as `add` takes user input from stdin.
+
 use crate::*;
 use anyhow::{ensure, Context, Result};
 use chrono::Utc;
 use std::path::Path;
 
+/// Add an entry to database.
+///
+/// If database file doesn't exist, then create new one with user's permission.
 pub fn add<P: AsRef<Path>>(db_path: &P, base32_encode: bool) -> Result<()> {
     let db_path = db_path.as_ref();
     let (mut db, password) = match db_path.is_file() {
@@ -11,7 +19,7 @@ pub fn add<P: AsRef<Path>>(db_path: &P, base32_encode: bool) -> Result<()> {
                 .with_prompt("Database password")
                 .interact()
                 .unwrap();
-            let db = database::load_database(db_path, &password)
+            let db = database::load_database(&db_path, &password)
                 .context(format!("Failed to load database from {:?}.", db_path))?;
             (db, password)
         }
@@ -83,39 +91,43 @@ pub fn add<P: AsRef<Path>>(db_path: &P, base32_encode: bool) -> Result<()> {
         &_ => otp::HashType::Sha1,
     };
     let client = match base32_encode {
-        true => otp::TotpClient::new_from_base32key(key, timestep, t0, digit, hashtype)?,
+        true => otp::TotpClient::from_base32key(key, timestep, t0, digit, hashtype)?,
         false => otp::TotpClient::new(key.as_bytes().to_vec(), timestep, t0, digit, hashtype),
     };
     db.insert(name.clone(), client);
-    database::save_database(&db, db_path, &password)
+    database::save_database(&db, &db_path, &password)
         .context(format!("Failed to save database to {:?}", db_path))?;
     println!("Success to add item: {}", name);
     Ok(())
 }
 
+/// Remove an entry from database.
 pub fn remove<P: AsRef<Path>>(db_path: &P, name: &str) -> Result<()> {
-    let db_path = db_path.as_ref();
     let password: String = dialoguer::Password::new()
         .with_prompt("Database password")
         .interact()
         .unwrap();
-    let mut db = database::load_database(&db_path, &password)
-        .context(format!("Failed to load database from {:?}.", db_path))?;
+    let mut db = database::load_database(db_path, &password).context(format!(
+        "Failed to load database from {:?}.",
+        db_path.as_ref()
+    ))?;
     db.remove(name);
-    database::save_database(&db, &db_path, &password)
-        .context(format!("Failed to save database to {:?}", db_path))?;
+    database::save_database(&db, db_path, &password)
+        .context(format!("Failed to save database to {:?}", db_path.as_ref()))?;
     println!("Success to remove item: {}", name);
     Ok(())
 }
 
+/// Show present TOTP value of entry.
 pub fn show<P: AsRef<Path>>(db_path: &P, name: &str) -> Result<()> {
-    let db_path = db_path.as_ref();
     let password: String = dialoguer::Password::new()
         .with_prompt("Database password")
         .interact()
         .unwrap();
-    let db = database::load_database(&db_path, &password)
-        .context(format!("Failed to load database from {:?}.", db_path))?;
+    let db = database::load_database(db_path, &password).context(format!(
+        "Failed to load database from {:?}.",
+        db_path.as_ref()
+    ))?;
     let client = &db[name];
     println!(
         "{:0>digit$}",
@@ -125,14 +137,16 @@ pub fn show<P: AsRef<Path>>(db_path: &P, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Show list of entry names.
 pub fn list<P: AsRef<Path>>(db_path: &P) -> Result<()> {
-    let db_path = db_path.as_ref();
     let password: String = dialoguer::Password::new()
         .with_prompt("Database password")
         .interact()
         .unwrap();
-    let db = database::load_database(&db_path, &password)
-        .context(format!("Failed to load database from {:?}.", db_path))?;
+    let db = database::load_database(db_path, &password).context(format!(
+        "Failed to load database from {:?}.",
+        db_path.as_ref()
+    ))?;
     for name in db.keys() {
         println!("{}", name);
     }
