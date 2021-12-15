@@ -2,7 +2,7 @@
 name = "yatotp"
 version = "0.1.0"
 edition = "2021"
-authers = ["Nobuto Kaitoh <nobutoka@gmail.com>"]
+authors = ["Nobuto Kaitoh <nobutoka@gmail.com>"]
 description = "A yet another TOTP client which stores its data locally."
 license = "GPL-3.0-or-later"
 
