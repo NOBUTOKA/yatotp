@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hmac-sha1 = "0.1"
 chrono = "0.4"
 hmac = "0.12"
 sha-1 = "0.10"
@@ -18,3 +17,6 @@ tempfile = "3.2"
 anyhow = "1.0"
 structopt = "0.3"
 dialoguer = "0.9"
+chacha20poly1305 = "0.9"
+rand = {version = "0.8", features = ["std"]}
+argon2 = "0.3"
