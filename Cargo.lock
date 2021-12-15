@@ -701,7 +701,6 @@ dependencies = [
  "sha-1",
  "sha2",
  "structopt",
- "tempfile",
 ]
 
 [[package]]
