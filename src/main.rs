@@ -1,18 +1,19 @@
+// yatotp: Yet Another Time-Based OTP client.
 // Copyright 2021, Nobuto Kaitoh
 //
 // This file is part of yatotp.
 //
 // Yatotp is free software: you can redistribute it and/or
-// it under the terms of the GNU General Public License as published by
+// it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
 // Yatotp is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
+// GNU Affero General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
+// You should have received a copy of the GNU Affero General Public License
 // along with yatotp.  If not, see <https://www.gnu.org/licenses/>.
 
 extern crate yatotp;
@@ -66,18 +67,4 @@ fn main() -> Result<()> {
         Command::Newpass => cli::change_password(&args.database),
     }?;
     Ok(())
-    // totp.insert(
-    //     "test".to_string(),
-    //     otp::TotpClient::new_from_base32key(
-    //         "JBSWY3DPEHPK3PXP".to_string(),
-    //         30,
-    //         0,
-    //         6,
-    //         otp::HashType::Sha1,
-    //     )
-    //     .unwrap(),
-    // );
-    // println!("{}", totp["test"].totp(&Utc::now()));
-    // let save_path = path::Path::new("./clients.json");
-    // database::save_database(&totp, &save_path).unwrap();
 }
