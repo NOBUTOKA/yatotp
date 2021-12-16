@@ -1,6 +1,6 @@
 [package]
 name = "yatotp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Nobuto Kaitoh <nobutoka@gmail.com>"]
 description = "Yet Another TOTP client which stores its data locally."
@@ -28,5 +28,5 @@ argon2 = "0.3"
 tempfile = "3.2"
 
 [badges]
-maintainance = {status = "actively-developed"}
+maintenance = {status = "actively-developed"}
 github = {repository = "NOBUTOKA/yatotp", workflow = "Rust"}
