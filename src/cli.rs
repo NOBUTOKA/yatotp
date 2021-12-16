@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with yatotp.  If not, see <https://www.gnu.org/licenses/>.
 
-
 //! Command-line Interface of yatotp.
 //!
 //! Each command loads database file, do some works, and then save database file if needed.
@@ -25,6 +24,57 @@ use crate::*;
 use anyhow::{ensure, Context, Result};
 use chrono::Utc;
 use std::path::Path;
+
+/// Create and save new database.
+pub fn create<P: AsRef<Path>>(db_path: &P) -> Result<()> {
+    if db_path.as_ref().is_file() {
+        println!("The database is already exists.");
+        if !dialoguer::Confirm::new()
+            .with_prompt("Overwrite?")
+            .interact()
+            .unwrap()
+        {
+            return Ok(());
+        }
+    } else {
+        println!("Create a new database.");
+    }
+    let password: String = dialoguer::Password::new()
+        .with_prompt("Please enter password for new database")
+        .with_confirmation("Confirm new password", "Passwords don't match.")
+        .interact()
+        .unwrap();
+    let db = database::TotpDatabase::new();
+    database::save_database(&db, &db_path, &password).context(format!(
+        "Failed to save database to {}",
+        db_path.as_ref().display()
+    ))?;
+    println!(
+        "New database file is successfuly created: {}.",
+        db_path.as_ref().display()
+    );
+    Ok(())
+}
+
+/// Change password of database.
+pub fn change_password<P: AsRef<Path>>(db_path: &P) -> Result<()> {
+    let password: String = dialoguer::Password::new()
+        .with_prompt("Current database password")
+        .interact()
+        .unwrap();
+    let db = database::load_database(&db_path, &password)?;
+    let password: String = dialoguer::Password::new()
+        .with_prompt("New password")
+        .with_confirmation("Confirm new password", "Passwords don't match.")
+        .interact()
+        .unwrap();
+    database::save_database(&db, &db_path, &password).context(format!(
+        "Failed to save database to {}",
+        db_path.as_ref().display()
+    ))?;
+    println!("Password is successfully changed.");
+    Ok(())
+}
 
 /// Add an entry to database.
 ///
@@ -37,8 +87,10 @@ pub fn add<P: AsRef<Path>>(db_path: &P, base32_encode: bool) -> Result<()> {
                 .with_prompt("Database password")
                 .interact()
                 .unwrap();
-            let db = database::load_database(&db_path, &password)
-                .context(format!("Failed to load database from {:?}.", db_path))?;
+            let db = database::load_database(&db_path, &password).context(format!(
+                "Failed to load database from {}.",
+                db_path.display()
+            ))?;
             (db, password)
         }
         false => {
@@ -114,7 +166,7 @@ pub fn add<P: AsRef<Path>>(db_path: &P, base32_encode: bool) -> Result<()> {
     };
     db.insert(name.clone(), client);
     database::save_database(&db, &db_path, &password)
-        .context(format!("Failed to save database to {:?}", db_path))?;
+        .context(format!("Failed to save database to {}", db_path.display()))?;
     println!("Success to add item: {}", name);
     Ok(())
 }
@@ -126,12 +178,14 @@ pub fn remove<P: AsRef<Path>>(db_path: &P, name: &str) -> Result<()> {
         .interact()
         .unwrap();
     let mut db = database::load_database(db_path, &password).context(format!(
-        "Failed to load database from {:?}.",
-        db_path.as_ref()
+        "Failed to load database from {}.",
+        db_path.as_ref().display()
     ))?;
     db.remove(name);
-    database::save_database(&db, db_path, &password)
-        .context(format!("Failed to save database to {:?}", db_path.as_ref()))?;
+    database::save_database(&db, db_path, &password).context(format!(
+        "Failed to save database to {}",
+        db_path.as_ref().display()
+    ))?;
     println!("Success to remove item: {}", name);
     Ok(())
 }
@@ -143,8 +197,8 @@ pub fn show<P: AsRef<Path>>(db_path: &P, name: &str) -> Result<()> {
         .interact()
         .unwrap();
     let db = database::load_database(db_path, &password).context(format!(
-        "Failed to load database from {:?}.",
-        db_path.as_ref()
+        "Failed to load database from {}.",
+        db_path.as_ref().display()
     ))?;
     let client = &db[name];
     println!(
@@ -162,8 +216,8 @@ pub fn list<P: AsRef<Path>>(db_path: &P) -> Result<()> {
         .interact()
         .unwrap();
     let db = database::load_database(db_path, &password).context(format!(
-        "Failed to load database from {:?}.",
-        db_path.as_ref()
+        "Failed to load database from {}.",
+        db_path.as_ref().display()
     ))?;
     for name in db.keys() {
         println!("{}", name);

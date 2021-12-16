@@ -32,6 +32,8 @@ struct Args {
 
 #[derive(StructOpt)]
 enum Command {
+    /// Create new database,
+    Create,
     /// Add new entry to database.
     Add {
         #[structopt(short = "e", long, help = "Treat key as base32 encoded.")]
@@ -49,16 +51,20 @@ enum Command {
     },
     /// Print list of TOTP entries.
     List,
+    /// Change database password to new one.
+    Newpass,
 }
 
 fn main() -> Result<()> {
     let args = Args::from_args();
     match args.command {
-        Command::Add { base32_encode } => cli::add(&args.database, base32_encode)?,
-        Command::Remove { name } => cli::remove(&args.database, &name)?,
-        Command::Show { name } => cli::show(&args.database, &name)?,
-        Command::List => cli::list(&args.database)?,
-    }
+        Command::Create => cli::create(&args.database),
+        Command::Add { base32_encode } => cli::add(&args.database, base32_encode),
+        Command::Remove { name } => cli::remove(&args.database, &name),
+        Command::Show { name } => cli::show(&args.database, &name),
+        Command::List => cli::list(&args.database),
+        Command::Newpass => cli::change_password(&args.database),
+    }?;
     Ok(())
     // totp.insert(
     //     "test".to_string(),

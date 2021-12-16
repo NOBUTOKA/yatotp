@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with yatotp.  If not, see <https://www.gnu.org/licenses/>.
 
-
 //! Save and load TOTP clients database file.
 //!
 //! Database file is encrypted with Argon2id and ChaCha20Poly1305.
@@ -91,7 +90,7 @@ pub fn save_database<P: AsRef<Path>>(
         .unwrap()
         .hash
         .unwrap();
-    let cipher = ChaCha20Poly1305::new(&Key::from_slice(key.as_bytes()));
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(key.as_bytes()));
     let mut nonce = Utc::now().timestamp_millis().to_be_bytes().to_vec();
     nonce.append(
         &mut (thread_rng()
@@ -101,7 +100,7 @@ pub fn save_database<P: AsRef<Path>>(
     );
     let nonce = Nonce::from_slice(&nonce);
     let serialized = serde_json::to_string(database)?;
-    let encrypted = match cipher.encrypt(&nonce, serialized.as_bytes()) {
+    let encrypted = match cipher.encrypt(nonce, serialized.as_bytes()) {
         Ok(c) => c,
         Err(e) => bail!("Encryption failed: {}", e),
     };
@@ -136,7 +135,7 @@ pub fn load_database<P: AsRef<Path>>(path: &P, password: &str) -> Result<TotpDat
         .unwrap()
         .hash
         .unwrap();
-    let cipher = ChaCha20Poly1305::new(&Key::from_slice(key.as_bytes()));
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(key.as_bytes()));
     let serialized = match cipher.decrypt(nonce, encrypted.as_slice()) {
         Ok(c) => c,
         Err(e) => bail!("Decryption failed: {}", e),

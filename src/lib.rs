@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with yatotp.  If not, see <https://www.gnu.org/licenses/>.
 
-
 #![warn(missing_docs)]
 //! Yet Another Time-based OTP client.
 //!
