@@ -21,10 +21,10 @@
 //! Each command loads database file, do some works, and then save database file if needed.
 //! Some command such as `add` takes user input from stdin.
 
-use crate::*;
 use anyhow::{ensure, Context, Result};
 use chrono::Utc;
 use std::path::Path;
+use yatotp::*;
 
 /// Create and save new database.
 pub fn create<P: AsRef<Path>>(db_path: &P) -> Result<()> {

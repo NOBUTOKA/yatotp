@@ -16,8 +16,8 @@ In other words, the aim of this project is TOTP version of [Keepass].
 
 [Keepass]: https://keepass.info
 
-## Usage
 For now, it have only command-line interface.
+## Usage
 - Create database file (encryption password is needed).
   ```sh
   yatotp -i [database file path] create

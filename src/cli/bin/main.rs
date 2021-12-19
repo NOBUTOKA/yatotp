@@ -16,11 +16,42 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with yatotp.  If not, see <https://www.gnu.org/licenses/>.
 
-extern crate yatotp;
+//! Command-line interface for [yatotp].
+//! # Usage
+//! - Create database file (encryption password is needed).
+//!   ```sh
+//!   yatotp -i [database file path] create
+//!   ```
+//! - Add database to entry interactively.
+//!   ```sh
+//!   yatotp -i [database file path] add
+//!   ```
+//!   If you want to use base32-encoded secret key, such as gained from OpenAuth URI,
+//!   add switch `-e` (`e` for Encoded) like this:
+//!   ```sh
+//!   yatotp -i [database file path] add -e
+//!   ```
+//! - Show TOTP value of the entry.
+//!   ```sh
+//!   yatotp -i [database file path] show [entry name]
+//!   ```
+//! - List entries in database.
+//!   ```sh
+//!   yatotp -i [database file path] list
+//!   ```
+//! - Remove the entry from database.
+//!   ```sh
+//!   yatotp -i [database file path] remove [entry name]
+//!   ```
+//! - Change database password to new one.
+//!   ```sh
+//!   yatotp -i [database file path] newpass
+//!   ```
+
+mod cli;
 
 use anyhow::Result;
 use structopt::StructOpt;
-use yatotp::*;
 
 #[derive(StructOpt)]
 #[structopt(about = "Yet Another TOTP Client.")]

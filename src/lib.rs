@@ -27,6 +27,5 @@
 //!
 //! [Keepass]: https://keepass.info
 
-pub mod cli;
 pub mod database;
 pub mod otp;
