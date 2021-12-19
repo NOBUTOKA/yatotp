@@ -23,9 +23,11 @@ rand = {version = "0.8", features = ["std"]}
 argon2 = "0.3"
 structopt = {version = "0.3", optional = true}
 dialoguer = {version = "0.9", optional = true}
+iced = {version = "0.3", optional = true}
 
 [features]
 cli = ["structopt", "dialoguer"]
+gui = ["iced"]
 
 [lib]
 name = "yatotp"
@@ -35,6 +37,11 @@ path = "src/lib.rs"
 name = "yatotp-cli"
 required-features = ["cli"]
 path = "src/cli/bin/main.rs"
+
+[[bin]]
+name = "yatotpx"
+required-features = ["gui"]
+path = "src/gui/bin/main.rs"
 
 [dev-dependencies]
 tempfile = "3.2"
