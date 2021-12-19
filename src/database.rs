@@ -95,7 +95,7 @@ pub fn save_database<P: AsRef<Path>>(
     let mut nonce = Utc::now().timestamp_millis().to_be_bytes().to_vec();
     nonce.append(
         &mut (thread_rng()
-            .sample_iter(Standard)
+            .sample_iter::<u8, Standard>(Standard)
             .take(CHACHA20_NONCE_LEN - nonce.len())
             .collect()),
     );
