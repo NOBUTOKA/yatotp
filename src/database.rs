@@ -44,6 +44,42 @@ const CHACHA20_KEY_LEN: usize = 32;
 /// The collection of TOTP clients.
 pub type TotpDatabase = std::collections::HashMap<String, otp::TotpClient>;
 
+struct SerializedDatabase {
+    data: String,
+}
+
+/// Wrapper for serialized [TotpDatabase].
+/// It ensure its memory is filled with random bytes when dropped.
+impl SerializedDatabase {
+    /// Create instance from serialized string.
+    fn new(data: String) -> SerializedDatabase {
+        SerializedDatabase { data }
+    }
+
+    /// Serialize database.
+    fn serialize(database: &TotpDatabase) -> Result<SerializedDatabase> {
+        let data = serde_json::to_string(database)?;
+        Ok(SerializedDatabase { data })
+    }
+
+    /// Deserialize database.
+    fn deserialize(&self) -> Result<TotpDatabase> {
+        Ok(serde_json::from_str::<TotpDatabase>(&self.data)?)
+    }
+}
+
+impl Drop for SerializedDatabase {
+    fn drop(&mut self) {
+        unsafe { thread_rng().fill(self.data.as_bytes_mut()) }
+    }
+}
+
+impl AsRef<[u8]> for SerializedDatabase {
+    fn as_ref(&self) -> &[u8] {
+        self.data.as_bytes()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 struct EncryptedDatabase {
     nonce: String,
@@ -52,14 +88,65 @@ struct EncryptedDatabase {
 }
 
 impl EncryptedDatabase {
-    fn new(nonce: &[u8], salt: String, encrypted_data: &[u8]) -> EncryptedDatabase {
-        let nonce = BASE64.encode(nonce);
-        let encrypted_data = BASE64.encode(encrypted_data);
-        EncryptedDatabase {
-            nonce,
-            salt,
-            encrypted_data,
-        }
+    fn encrypt(database: &TotpDatabase, password: &str) -> Result<EncryptedDatabase> {
+        let salt = SaltString::generate(&mut OsRng);
+        let mut argon2param = ParamsBuilder::new();
+        argon2param.output_len(CHACHA20_KEY_LEN).unwrap();
+        let hasher = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            argon2param.params().unwrap(),
+        );
+        let key = hasher
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .hash
+            .unwrap();
+        let cipher = ChaCha20Poly1305::new(Key::from_slice(key.as_bytes()));
+        let mut nonce = Utc::now().timestamp_millis().to_be_bytes().to_vec();
+        nonce.append(
+            &mut (thread_rng()
+                .sample_iter::<u8, Standard>(Standard)
+                .take(CHACHA20_NONCE_LEN - nonce.len())
+                .collect()),
+        );
+        let nonce = Nonce::from_slice(&nonce);
+        let serialized = SerializedDatabase::serialize(database)?;
+        let encrypted = match cipher.encrypt(nonce, serialized.as_ref()) {
+            Ok(c) => c,
+            Err(e) => bail!("Encryption failed: {}", e),
+        };
+
+        Ok(EncryptedDatabase {
+            nonce: BASE64.encode(nonce),
+            salt: salt.as_str().to_string(),
+            encrypted_data: BASE64.encode(&encrypted),
+        })
+    }
+
+    fn decrypt(&self, password: &str) -> Result<TotpDatabase> {
+        let nonce = BASE64.decode(self.nonce.as_bytes())?;
+        let nonce = Nonce::from_slice(&nonce);
+        let salt = SaltString::new(&self.salt).unwrap();
+        let encrypted = BASE64.decode(self.encrypted_data.as_bytes())?;
+        let mut argon2param = ParamsBuilder::new();
+        argon2param.output_len(CHACHA20_KEY_LEN).unwrap();
+        let hasher = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            argon2param.params().unwrap(),
+        );
+        let key = hasher
+            .hash_password(password.as_bytes(), &salt)
+            .unwrap()
+            .hash
+            .unwrap();
+        let cipher = ChaCha20Poly1305::new(Key::from_slice(key.as_bytes()));
+        let serialized = match cipher.decrypt(nonce, encrypted.as_slice()) {
+            Ok(c) => c,
+            Err(e) => bail!("Decryption failed: {}", e),
+        };
+        SerializedDatabase::new(String::from_utf8(serialized)?).deserialize()
     }
 }
 
@@ -72,41 +159,13 @@ impl EncryptedDatabase {
 ///
 /// Then, JSON-serialized TotpDatabase is encrypted with this ChaCha20,
 /// and then base64-encoded nonce, salt, and encrypted database is saved in JSON file.
-pub fn save_database<P: AsRef<Path>>(
-    database: &TotpDatabase,
-    path: &P,
-    password: &str,
-) -> Result<()> {
+pub fn save_database<P>(database: &TotpDatabase, path: &P, password: &str) -> Result<()>
+where
+    P: AsRef<Path>,
+{
     let path = path.as_ref();
-    let salt = SaltString::generate(&mut OsRng);
-    let mut argon2param = ParamsBuilder::new();
-    argon2param.output_len(CHACHA20_KEY_LEN).unwrap();
-    let hasher = Argon2::new(
-        Algorithm::Argon2id,
-        Version::V0x13,
-        argon2param.params().unwrap(),
-    );
-    let key = hasher
-        .hash_password(password.as_bytes(), &salt)
-        .unwrap()
-        .hash
-        .unwrap();
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(key.as_bytes()));
-    let mut nonce = Utc::now().timestamp_millis().to_be_bytes().to_vec();
-    nonce.append(
-        &mut (thread_rng()
-            .sample_iter::<u8, Standard>(Standard)
-            .take(CHACHA20_NONCE_LEN - nonce.len())
-            .collect()),
-    );
-    let nonce = Nonce::from_slice(&nonce);
-    let serialized = serde_json::to_string(database)?;
-    let encrypted = match cipher.encrypt(nonce, serialized.as_bytes()) {
-        Ok(c) => c,
-        Err(e) => bail!("Encryption failed: {}", e),
-    };
     let mut f = BufWriter::new(std::fs::File::create(path)?);
-    let enc_db = EncryptedDatabase::new(nonce.as_slice(), salt.as_str().to_string(), &encrypted);
+    let enc_db = EncryptedDatabase::encrypt(database, password)?;
     f.write_all(serde_json::to_string(&enc_db)?.as_bytes())?;
     Ok(())
 }
@@ -114,35 +173,16 @@ pub fn save_database<P: AsRef<Path>>(
 /// Load and Decrypt database from file.
 ///
 /// Nonce and salt used to encrypt database when [save_database] is gained from database file.
-pub fn load_database<P: AsRef<Path>>(path: &P, password: &str) -> Result<TotpDatabase> {
+pub fn load_database<P>(path: &P, password: &str) -> Result<TotpDatabase>
+where
+    P: AsRef<Path>,
+{
     let path = path.as_ref();
     let mut f = BufReader::new(std::fs::File::open(path)?);
     let mut enc_db = String::new();
     f.read_to_string(&mut enc_db)?;
     let enc_db = serde_json::from_str::<EncryptedDatabase>(&enc_db)?;
-    let nonce = BASE64.decode(enc_db.nonce.as_bytes())?;
-    let nonce = Nonce::from_slice(&nonce);
-    let salt = SaltString::new(&enc_db.salt).unwrap();
-    let encrypted = BASE64.decode(enc_db.encrypted_data.as_bytes())?;
-    let mut argon2param = ParamsBuilder::new();
-    argon2param.output_len(CHACHA20_KEY_LEN).unwrap();
-    let hasher = Argon2::new(
-        Algorithm::Argon2id,
-        Version::V0x13,
-        argon2param.params().unwrap(),
-    );
-    let key = hasher
-        .hash_password(password.as_bytes(), &salt)
-        .unwrap()
-        .hash
-        .unwrap();
-    let cipher = ChaCha20Poly1305::new(Key::from_slice(key.as_bytes()));
-    let serialized = match cipher.decrypt(nonce, encrypted.as_slice()) {
-        Ok(c) => c,
-        Err(e) => bail!("Decryption failed: {}", e),
-    };
-    let serialized = String::from_utf8(serialized)?;
-    Ok(serde_json::from_str::<TotpDatabase>(&serialized)?)
+    enc_db.decrypt(password)
 }
 
 #[cfg(test)]
