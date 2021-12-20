@@ -21,6 +21,7 @@ anyhow = "1.0"
 chacha20poly1305 = "0.9"
 rand = {version = "0.8", features = ["std"]}
 argon2 = "0.3"
+shielded = {git = "https://github.com/NOBUTOKA/shielded", branch = "ImmutableUnshield"}
 structopt = {version = "0.3", optional = true}
 dialoguer = {version = "0.9", optional = true}
 

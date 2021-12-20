@@ -30,6 +30,7 @@ use hmac::{Hmac, Mac};
 use serde;
 use sha1::Sha1;
 use sha2::{Sha256, Sha512};
+use shielded::Shielded;
 
 /// Hash function used in HMAC calculation.
 ///
@@ -38,7 +39,7 @@ use sha2::{Sha256, Sha512};
 ///
 /// [RFC 6238]: https://datatracker.ietf.org/doc/html/rfc6238
 /// [RFC 4226]: https://datatracker.ietf.org/doc/html/rfc4226
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Clone, Copy, Debug)]
 pub enum HashType {
     /// Use SHA-1 as a hash function.
     Sha1,
@@ -48,9 +49,10 @@ pub enum HashType {
     Sha512,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(into = "HotpClientDef", from = "HotpClientDef")]
 struct HotpClient {
-    key: Vec<u8>,
+    key: Shielded,
     digit: u32,
     hashtype: HashType,
 }
@@ -58,7 +60,7 @@ struct HotpClient {
 impl HotpClient {
     fn new(key: Vec<u8>, digit: u32, hashtype: HashType) -> HotpClient {
         HotpClient {
-            key,
+            key: Shielded::new(key),
             digit,
             hashtype,
         }
@@ -75,28 +77,79 @@ impl HotpClient {
     }
 
     fn hmac_sha1(&self, counter: &u64) -> Vec<u8> {
-        let mut hasher =
-            Hmac::<Sha1>::new_from_slice(&self.key).expect("HMAC can take key of any size");
+        let mut hasher = Hmac::<Sha1>::new_from_slice(self.key.clone_and_unshield().as_ref())
+            .expect("HMAC can take key of any size");
         hasher.update(&counter.to_be_bytes());
         hasher.finalize().into_bytes().to_vec()
     }
 
     fn hmac_sha256(&self, counter: &u64) -> Vec<u8> {
-        let mut hasher =
-            Hmac::<Sha256>::new_from_slice(&self.key).expect("HMAC can take key of any size");
+        let mut hasher = Hmac::<Sha256>::new_from_slice(self.key.clone_and_unshield().as_ref())
+            .expect("HMAC can take key of any size");
         hasher.update(&counter.to_be_bytes());
         hasher.finalize().into_bytes().to_vec()
     }
 
     fn hmac_sha512(&self, counter: &u64) -> Vec<u8> {
-        let mut hasher =
-            Hmac::<Sha512>::new_from_slice(&self.key).expect("HMAC can take key of any size");
+        let mut hasher = Hmac::<Sha512>::new_from_slice(self.key.clone_and_unshield().as_ref())
+            .expect("HMAC can take key of any size");
         hasher.update(&counter.to_be_bytes());
         hasher.finalize().into_bytes().to_vec()
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
+impl PartialEq for HotpClient {
+    fn eq(&self, other: &HotpClient) -> bool {
+        (self.key.clone_and_unshield().as_ref() == other.key.clone_and_unshield().as_ref())
+            && (self.digit == other.digit)
+            && (self.hashtype == other.hashtype)
+    }
+}
+
+impl Clone for HotpClient {
+    fn clone(&self) -> Self {
+        HotpClient::new(
+            self.key.clone_and_unshield().as_ref().to_vec(),
+            self.digit,
+            self.hashtype,
+        )
+    }
+}
+
+impl From<HotpClientDef> for HotpClient {
+    fn from(c: HotpClientDef) -> Self {
+        HotpClient::new(c.key, c.digit, c.hashtype)
+    }
+}
+
+impl std::fmt::Debug for HotpClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HotpClient")
+            .field("key", &"Encrypted")
+            .field("digit", &self.digit)
+            .field("hashtype", &self.hashtype)
+            .finish()
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct HotpClientDef {
+    key: Vec<u8>,
+    digit: u32,
+    hashtype: HashType,
+}
+
+impl From<HotpClient> for HotpClientDef {
+    fn from(c: HotpClient) -> Self {
+        HotpClientDef {
+            key: c.key.clone_and_unshield().as_ref().to_vec(),
+            digit: c.digit,
+            hashtype: c.hashtype,
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Debug)]
 /// A TOTP client for each account.
 ///
 /// # Example
